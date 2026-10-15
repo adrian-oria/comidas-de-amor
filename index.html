@@ -388,22 +388,30 @@ function setLoginStatus(msg) {
 
 setLoginStatus('Comprobando sesión...');
 
+// Wait for redirect result first, THEN subscribe to auth state
+// This prevents onAuthStateChanged firing with null before the redirect resolves
 auth.getRedirectResult().then(result => {
   if (result && result.user) {
+    // Just came back from Google redirect — user is now signed in
     setLoginStatus('¡Sesión iniciada! Cargando...');
+    currentUser = result.user;
+    showHome();
   } else {
-    setLoginStatus('');
+    // No redirect in progress — use normal auth state listener
+    auth.onAuthStateChanged(user => {
+      currentUser = user;
+      if (user) { setLoginStatus(''); showHome(); }
+      else { setLoginStatus(''); showScreen('screen-login'); }
+    });
   }
 }).catch(e => {
   console.error('Redirect error:', e.code, e.message);
-  setLoginStatus('');
-  auth.signOut().catch(() => {});
-});
-
-auth.onAuthStateChanged(user => {
-  currentUser = user;
-  if (user) { setLoginStatus(''); showHome(); }
-  else { setLoginStatus(''); showScreen('screen-login'); }
+  // On error, still set up the listener so normal login works
+  auth.onAuthStateChanged(user => {
+    currentUser = user;
+    if (user) { setLoginStatus(''); showHome(); }
+    else { setLoginStatus(''); showScreen('screen-login'); }
+  });
 });
 
 function loginWithGoogle() {
