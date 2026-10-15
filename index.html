@@ -379,6 +379,14 @@ function setSyncStatus(state) {
 function uidToKey(email) { return email.replace(/\./g, ','); }
 
 // ── AUTH ──
+// Handle redirect result first (comes back after Google login on Safari/iOS)
+auth.getRedirectResult().then(result => {
+  // result.user is set if we just came back from a Google redirect
+  // onAuthStateChanged will fire right after and handle navigation
+}).catch(e => {
+  if (e.code !== 'auth/no-current-user') toast('Error al iniciar sesión');
+});
+
 auth.onAuthStateChanged(user => {
   currentUser = user;
   if (user) { showHome(); }
@@ -387,7 +395,10 @@ auth.onAuthStateChanged(user => {
 
 function loginWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider).catch(e => toast('Error al iniciar sesión'));
+  // Use redirect (works on Safari/iOS); falls back to popup on desktop if redirect fails
+  auth.signInWithRedirect(provider).catch(() => {
+    auth.signInWithPopup(provider).catch(e => toast('Error al iniciar sesión: ' + e.message));
+  });
 }
 function logout() {
   closeUserMenu();
