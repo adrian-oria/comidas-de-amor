@@ -1,0 +1,80 @@
+{
+  "rules": {
+    "userCalendars": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$calId": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.isBoolean()"
+        }
+      }
+    },
+    "calendars": {
+      "$calId": {
+        ".read": "auth != null && data.child('members').child(auth.uid).exists()",
+        ".write": "auth != null && auth.token.email_verified === true && ((!data.exists() && newData.child('ownerId').val() === auth.uid && newData.child('members').child(auth.uid).child('role').val() === 'owner') || (data.exists() && !newData.exists() && data.child('ownerId').val() === auth.uid))",
+        ".validate": "newData.hasChildren(['name', 'ownerId', 'members'])",
+
+        "name": {
+          ".write": "auth != null && data.parent().child('ownerId').val() === auth.uid",
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60"
+        },
+        "ownerId": {
+          ".validate": "newData.isString() && (!data.exists() || newData.val() === data.val())"
+        },
+        "createdAt": { ".validate": "newData.isNumber()" },
+
+        "members": {
+          "$uid": {
+            ".write": "auth != null && ((auth.uid === $uid && !data.exists() && auth.token.email_verified === true && newData.child('role').val() === 'member' && root.child('calendars').child($calId).child('invites').child(auth.token.email.toLowerCase().replace('.', ',')).exists()) || (auth.uid === $uid && data.exists() && !newData.exists() && data.child('role').val() !== 'owner') || (auth.uid !== $uid && !newData.exists() && data.child('role').val() !== 'owner' && root.child('calendars').child($calId).child('ownerId').val() === auth.uid))",
+            ".validate": "newData.hasChildren(['email', 'role']) && newData.child('email').val() === auth.token.email",
+            "email": { ".validate": "newData.isString()" },
+            "role": { ".validate": "newData.isString() && newData.val().matches(/^(owner|member)$/)" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "invites": {
+          "$emailKey": {
+            ".write": "auth != null && (root.child('calendars').child($calId).child('members').child(auth.uid).exists() || (!newData.exists() && auth.token.email.toLowerCase().replace('.', ',') === $emailKey))",
+            ".validate": "newData.hasChildren(['email', 'by', 'at'])",
+            "email": { ".validate": "newData.isString() && newData.val().length <= 254" },
+            "by": { ".validate": "newData.val() === auth.uid" },
+            "at": { ".validate": "newData.isNumber()" },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "dishes": {
+          ".write": "auth != null && root.child('calendars').child($calId).child('members').child(auth.uid).exists()",
+          "$dishId": {
+            ".validate": "newData.hasChildren(['name', 'type'])",
+            "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80" },
+            "type": { ".validate": "newData.isString() && newData.val().matches(/^(comida|cena|ambos)$/)" },
+            "accompaniments": {
+              "$i": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60" }
+            },
+            "$other": { ".validate": false }
+          }
+        },
+
+        "menu": {
+          ".write": "auth != null && root.child('calendars').child($calId).child('members').child(auth.uid).exists()",
+          "$date": {
+            ".validate": "$date.matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)",
+            "$slot": {
+              ".validate": "($slot === 'comida' || $slot === 'cena') && newData.hasChild('name')",
+              "name": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80" },
+              "acc": {
+                "$i": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60" }
+              },
+              "$other": { ".validate": false }
+            }
+          }
+        },
+
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}
